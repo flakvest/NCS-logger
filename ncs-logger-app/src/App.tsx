@@ -41,6 +41,34 @@ const zuluValueForInput = (value: string): string => {
   return zuluDateTimeInput(parsed)
 }
 
+const hourOptions = Array.from({ length: 24 }, (_, i) => pad(i))
+const minuteOptions = Array.from({ length: 60 }, (_, i) => pad(i))
+
+const parseDateTimeValue = (value: string): { date: string; hour: string; minute: string } => {
+  if (!value) {
+    const now = new Date()
+    return {
+      date: `${now.getUTCFullYear()}-${pad(now.getUTCMonth() + 1)}-${pad(now.getUTCDate())}`,
+      hour: '00',
+      minute: '00',
+    }
+  }
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    const local = value.slice(0, 16)
+    return {
+      date: local.slice(0, 10),
+      hour: local.slice(11, 13),
+      minute: local.slice(14, 16),
+    }
+  }
+  return {
+    date: `${parsed.getUTCFullYear()}-${pad(parsed.getUTCMonth() + 1)}-${pad(parsed.getUTCDate())}`,
+    hour: pad(parsed.getUTCHours()),
+    minute: pad(parsed.getUTCMinutes()),
+  }
+}
+
 const normalizeCallSign = (value: string): string => {
   const clean = value.trim().toUpperCase().replace(/[\s-]+/g, '')
 
@@ -150,6 +178,9 @@ function App() {
   const amendRecipientRef = useRef<HTMLInputElement>(null)
   const [showStationList, setShowStationList] = useState(false)
   const [stationListText, setStationListText] = useState('')
+  const dataRef = useRef(data)
+  dataRef.current = data
+  const savingRef = useRef(false)
 
   const [isDark, setIsDark] = useState(() => {
     const stored = (() => { try { return window.localStorage.getItem('ncs-logger-dark-mode') } catch { return null } })()
@@ -372,10 +403,25 @@ function App() {
     updateActiveLog((log) => ({ ...log, closeTime: normalizeZuluInput(zuluDateTimeInput()) }))
   }
 
+  const persistData = async () => {
+    if (savingRef.current) return
+    savingRef.current = true
+    try {
+      await saveLoggerData(dataRef.current)
+    } catch {
+      /* silent auto-save */
+    }
+    savingRef.current = false
+  }
+
   const saveNow = async () => {
     setSaveState('saving')
-    const saved = await saveLoggerData(data)
+    const saved = await saveLoggerData(dataRef.current)
     setSaveState(saved ? 'saved' : 'error')
+  }
+
+  const handleBlur = () => {
+    persistData()
   }
 
   const openDataFolder = async () => {
@@ -429,7 +475,7 @@ function App() {
   }
 
   return (
-    <main className="app-shell">
+    <main className="app-shell" onBlur={handleBlur}>
       <header className="top-bar">
         <div>
           <p className="eyebrow">Army MARS</p>
@@ -513,10 +559,37 @@ function App() {
             Net Start Date / Time Zulu
             <span className="input-with-button">
               <input
-                type="datetime-local"
-                value={zuluValueForInput(activeLog.startTime)}
-                onChange={(event) => updateLogField('startTime', normalizeZuluInput(event.target.value))}
+                type="date"
+                value={parseDateTimeValue(activeLog.startTime).date}
+                onChange={(event) => {
+                  const t = parseDateTimeValue(activeLog.startTime)
+                  updateLogField('startTime', normalizeZuluInput(`${event.target.value}T${t.hour}:${t.minute}`))
+                }}
               />
+              <select
+                value={parseDateTimeValue(activeLog.startTime).hour}
+                onChange={(event) => {
+                  const t = parseDateTimeValue(activeLog.startTime)
+                  updateLogField('startTime', normalizeZuluInput(`${t.date}T${event.target.value}:${t.minute}`))
+                }}
+              >
+                {hourOptions.map((h) => (
+                  <option key={h} value={h}>{h}</option>
+                ))}
+              </select>
+              <span className="time-separator">:</span>
+              <select
+                value={parseDateTimeValue(activeLog.startTime).minute}
+                onChange={(event) => {
+                  const t = parseDateTimeValue(activeLog.startTime)
+                  updateLogField('startTime', normalizeZuluInput(`${t.date}T${t.hour}:${event.target.value}`))
+                }}
+              >
+                {minuteOptions.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+              <span className="time-separator">Z</span>
               <button className="small-button" type="button" onClick={setNetStartTime}>
                 Now
               </button>
@@ -526,10 +599,37 @@ function App() {
             Net Close Date / Time Zulu
             <span className="input-with-button">
               <input
-                type="datetime-local"
-                value={zuluValueForInput(activeLog.closeTime)}
-                onChange={(event) => updateLogField('closeTime', normalizeZuluInput(event.target.value))}
+                type="date"
+                value={parseDateTimeValue(activeLog.closeTime).date}
+                onChange={(event) => {
+                  const t = parseDateTimeValue(activeLog.closeTime)
+                  updateLogField('closeTime', normalizeZuluInput(`${event.target.value}T${t.hour}:${t.minute}`))
+                }}
               />
+              <select
+                value={parseDateTimeValue(activeLog.closeTime).hour}
+                onChange={(event) => {
+                  const t = parseDateTimeValue(activeLog.closeTime)
+                  updateLogField('closeTime', normalizeZuluInput(`${t.date}T${event.target.value}:${t.minute}`))
+                }}
+              >
+                {hourOptions.map((h) => (
+                  <option key={h} value={h}>{h}</option>
+                ))}
+              </select>
+              <span className="time-separator">:</span>
+              <select
+                value={parseDateTimeValue(activeLog.closeTime).minute}
+                onChange={(event) => {
+                  const t = parseDateTimeValue(activeLog.closeTime)
+                  updateLogField('closeTime', normalizeZuluInput(`${t.date}T${t.hour}:${event.target.value}`))
+                }}
+              >
+                {minuteOptions.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+              <span className="time-separator">Z</span>
               <button className="small-button" type="button" onClick={closeNet}>
                 Now
               </button>

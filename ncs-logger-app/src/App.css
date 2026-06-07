@@ -214,8 +214,25 @@ label select {
   align-items: center;
 }
 
-.input-with-button input {
+.input-with-button input[type="date"] {
   flex: 1;
+  min-width: 140px;
+}
+
+.input-with-button select {
+  min-height: 42px;
+  padding: 8px 6px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  width: auto;
+  flex: 0 0 auto;
+}
+
+.time-separator {
+  font-weight: 400;
+  color: var(--text-muted);
+  font-size: 1rem;
+  padding: 0 1px;
 }
 
 .input-with-button .small-button {
